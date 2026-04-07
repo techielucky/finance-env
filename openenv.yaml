@@ -1,5 +1,5 @@
 name: finance-env
-description: Financial decision-making RL environment
+description: Real-world financial decision-making RL environment
 
 tasks:
   - easy
@@ -15,3 +15,4 @@ observation:
   balance: float
   savings: float
   expense: float
+  goal: float

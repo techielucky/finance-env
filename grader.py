@@ -5,17 +5,15 @@ def grade(state):
 
     score = 0.0
 
-    # reward savings
-    if savings > 0:
-        score += 0.4
+    # reward savings (max 0.5)
+    score += min(savings / 1000, 0.5)
 
     # penalty for overspending
     if expense > savings:
         score -= 0.3
 
-    # reward good balance
-    if balance > 500:
+    # reward stability
+    if balance > 300:
         score += 0.3
 
-    # clamp between 0 and 1
     return max(0.0, min(1.0, score))
