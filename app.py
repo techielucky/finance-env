@@ -22,11 +22,11 @@ def state():
     return env.state()
 
 
-# 🔥 REQUIRED MAIN FUNCTION (STRICT FORMAT)
+# ✅ REQUIRED ENTRYPOINT
 def main():
     uvicorn.run(app, host="0.0.0.0", port=7860)
 
 
-# 🔥 REQUIRED CALL
+# ✅ MUST BE PRESENT
 if __name__ == "__main__":
     main()
