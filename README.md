@@ -55,3 +55,15 @@ The reward function combines:
 - Stochastic external events
 
 This ensures a dense and meaningful learning signal for agent evaluation.
+
+## 🧠 Why This Environment Stands Out
+
+This environment is designed to simulate realistic financial decision-making:
+
+- Decisions have long-term consequences (temporal dependency)
+- Multiple trade-offs between saving, investing, and spending
+- Stochastic life events introduce uncertainty
+- Goal-based optimization encourages strategic planning
+- Reward function aligns with real-world financial health
+
+This makes it a non-trivial benchmark for evaluating intelligent agents in real-world scenarios.
