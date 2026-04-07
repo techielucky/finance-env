@@ -1,0 +1,17 @@
+name: finance-env
+description: Financial decision-making RL environment
+
+tasks:
+  - easy
+  - medium
+  - hard
+
+actions:
+  - invest
+  - save
+  - spend
+
+observation:
+  balance: float
+  savings: float
+  expense: float
