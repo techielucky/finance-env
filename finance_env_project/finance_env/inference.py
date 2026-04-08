@@ -2,34 +2,34 @@ import os
 import json
 import urllib.request
 
-API_BASE_URL = os.getenv("API_BASE_URL")
-API_KEY = os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 
 
 def llm_call(prompt):
-    url = f"{API_BASE_URL}/v1/chat/completions"
+    url = API_BASE_URL
 
     data = json.dumps({
         "model": MODEL_NAME,
         "messages": [
             {"role": "user", "content": prompt}
-        ],
-        "temperature": 0
+        ]
     }).encode("utf-8")
 
     req = urllib.request.Request(
         url,
         data=data,
         headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}"
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
         }
     )
 
     with urllib.request.urlopen(req) as response:
         result = json.loads(response.read().decode())
-        return result["choices"][0]["message"]["content"].strip().lower()
+
+    return result["choices"][0]["message"]["content"].strip().lower()
 
 
 def post_env(endpoint, data=None):
@@ -76,14 +76,7 @@ def main():
 
         while not done and step_count < 10:
 
-            prompt = f"""
-State: {state}
-
-Choose ONE action:
-invest, save, spend
-
-Respond only with the action.
-"""
+            prompt = f"State: {state}. Choose one action: invest, save, spend."
 
             action = llm_call(prompt)
 
