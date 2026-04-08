@@ -2,90 +2,72 @@ import os
 import json
 import urllib.request
 
-# 🚨 UPDATED: Using the logic from the Hackathon Bot
-# The bot says HF_TOKEN is used as the api_key
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
 HF_TOKEN = os.getenv("HF_TOKEN")
+TASK_TYPE = os.getenv("TASK_TYPE", "easy") 
 
-if HF_TOKEN is None:
-    raise ValueError("HF_TOKEN environment variable is required")
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN is required")
 
-# 🏠 LOCAL: Point this to your FastAPI server running in the container
 ENV_API_BASE = "http://localhost:7860"
 
 def llm_call(prompt):
     url = f"{API_BASE_URL.rstrip('/')}/chat/completions"
-
     data = json.dumps({
         "model": MODEL_NAME,
         "messages": [
-            {"role": "system", "content": "You are a financial advisor. Reply ONLY with: invest, save, or spend."},
+            {"role": "system", "content": "Choose one: invest, save, spend."},
             {"role": "user", "content": prompt}
         ]
     }).encode("utf-8")
-
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {HF_TOKEN}", # Use HF_TOKEN here
-            "Content-Type": "application/json"
-        }
-    )
-
-    with urllib.request.urlopen(req) as response:
-        result = json.loads(response.read().decode())
-
+    req = urllib.request.Request(url, data=data, headers={
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    })
+    with urllib.request.urlopen(req) as res:
+        result = json.loads(res.read().decode())
     return result["choices"][0]["message"]["content"].strip().lower()
 
 def post_env(endpoint, data=None):
     url = f"{ENV_API_BASE}{endpoint}"
-    if data:
-        data = json.dumps(data).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-    with urllib.request.urlopen(req) as response:
-        return json.loads(response.read().decode())
+    if data: data = json.dumps(data).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req) as res:
+        return json.loads(res.read().decode())
 
 def main():
-    print("[START]")
+    print(f"[START] Task: {TASK_TYPE}")
     try:
-        state = post_env("/reset")
-        rewards = []
-        step_count = 0
+        state = post_env(f"/reset?task={TASK_TYPE}")
         done = False
+        step_idx = 0
+        rewards = []
+        final_score = 0.0
 
-        while not done and step_count < 10:
-            prompt = f"State: {state}. Action?"
-            action_raw = llm_call(prompt)
-            
-            # Simple parsing
+        while not done and step_idx < 10:
+            action_raw = llm_call(f"State: {state}")
             action = "save"
             for a in ["invest", "save", "spend"]:
                 if a in action_raw:
                     action = a
                     break
-
+            
             result = post_env("/step", {"action": action})
+            state = result.get("state")
+            done = result.get("done")
             reward = float(result.get("reward", 0.0))
-            done = result.get("done", False)
-            state = result.get("state", {})
+            final_score = result.get("score", 0.0)
             
             rewards.append(reward)
-            step_count += 1
-            print(f"[STEP] step={step_count} reward={reward:.2f}")
+            step_idx += 1
+            print(f"[STEP] {step_idx} reward={reward}")
 
         rewards_str = ",".join([f"{r:.2f}" for r in rewards])
-        print(f"[END] success=true steps={step_count} rewards={rewards_str}")
-
+        print(f"[END] success=true steps={step_idx} rewards={rewards_str} score={final_score}")
     except Exception as e:
-        print(f"[ERROR] {str(e)}")
-        print("[END] success=false steps=0 rewards=")
+        print(f"[ERROR] {e}")
+        print("[END] success=false steps=0 rewards= score=0.0")
 
 if __name__ == "__main__":
     main()
