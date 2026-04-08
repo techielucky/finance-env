@@ -1,15 +1,52 @@
 import os
-from openai import OpenAI
-import requests
+import json
+import urllib.request
 
 API_BASE_URL = os.getenv("API_BASE_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=API_KEY
-)
+
+def llm_call(prompt):
+    url = f"{API_BASE_URL}/v1/chat/completions"
+
+    data = json.dumps({
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}"
+        }
+    )
+
+    with urllib.request.urlopen(req) as response:
+        result = json.loads(response.read().decode())
+        return result["choices"][0]["message"]["content"].strip().lower()
+
+
+def post_env(endpoint, data=None):
+    url = f"{API_BASE_URL}{endpoint}"
+
+    if data:
+        data = json.dumps(data).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    with urllib.request.urlopen(req) as response:
+        return json.loads(response.read().decode())
 
 
 def log_start():
@@ -25,35 +62,6 @@ def log_end(success, steps, rewards):
     print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}")
 
 
-def get_action(state):
-    prompt = f"""
-You are a financial decision agent.
-
-State:
-{state}
-
-Choose ONE action from:
-- invest
-- save
-- spend
-
-Respond with ONLY the action.
-"""
-
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-
-    action = response.choices[0].message.content.strip().lower()
-
-    if action not in ["invest", "save", "spend"]:
-        action = "save"
-
-    return action
-
-
 def main():
     try:
         log_start()
@@ -62,22 +70,27 @@ def main():
         step_count = 0
         success = False
 
-        # RESET
-        res = requests.post(f"{API_BASE_URL}/reset")
-        state = res.json()
+        state = post_env("/reset")
 
         done = False
 
         while not done and step_count < 10:
 
-            action = get_action(state)
+            prompt = f"""
+State: {state}
 
-            res = requests.post(
-                f"{API_BASE_URL}/step",
-                params={"action": action}
-            )
+Choose ONE action:
+invest, save, spend
 
-            result = res.json()
+Respond only with the action.
+"""
+
+            action = llm_call(prompt)
+
+            if action not in ["invest", "save", "spend"]:
+                action = "save"
+
+            result = post_env("/step", {"action": action})
 
             reward = float(result.get("reward", 0.0))
             done = result.get("done", False)
