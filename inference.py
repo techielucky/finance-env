@@ -1,102 +1,73 @@
 import os
-from openai import OpenAI
-import requests
+import json
+import urllib.request
 
-API_BASE_URL = os.getenv("API_BASE_URL")
-API_KEY = os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
+TASK_TYPE = os.getenv("TASK_TYPE", "easy") 
 
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=API_KEY
-)
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN is required")
 
+ENV_API_BASE = "http://localhost:7860"
 
-def log_start():
-    print("[START]")
+def llm_call(prompt):
+    url = f"{API_BASE_URL.rstrip('/')}/chat/completions"
+    data = json.dumps({
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": "Choose one: invest, save, spend."},
+            {"role": "user", "content": prompt}
+        ]
+    }).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    })
+    with urllib.request.urlopen(req) as res:
+        result = json.loads(res.read().decode())
+    return result["choices"][0]["message"]["content"].strip().lower()
 
-
-def log_step(step, reward):
-    print(f"[STEP] step={step} reward={reward:.2f}")
-
-
-def log_end(success, steps, rewards):
-    rewards_str = ",".join([f"{r:.2f}" for r in rewards])
-    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}")
-
-
-def get_action(state):
-    prompt = f"""
-You are a financial decision agent.
-
-State:
-{state}
-
-Choose ONE action from:
-- invest
-- save
-- spend
-
-Respond with ONLY the action.
-"""
-
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-
-    action = response.choices[0].message.content.strip().lower()
-
-    if action not in ["invest", "save", "spend"]:
-        action = "save"
-
-    return action
-
+def post_env(endpoint, data=None):
+    url = f"{ENV_API_BASE}{endpoint}"
+    if data: data = json.dumps(data).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req) as res:
+        return json.loads(res.read().decode())
 
 def main():
+    print(f"[START] Task: {TASK_TYPE}")
     try:
-        log_start()
-
-        rewards = []
-        step_count = 0
-        success = False
-
-        # RESET
-        res = requests.post(f"{API_BASE_URL}/reset")
-        state = res.json()
-
+        state = post_env(f"/reset?task={TASK_TYPE}")
         done = False
+        step_idx = 0
+        rewards = []
+        final_score = 0.0
 
-        while not done and step_count < 10:
-
-            action = get_action(state)
-
-            res = requests.post(
-                f"{API_BASE_URL}/step",
-                params={"action": action}
-            )
-
-            result = res.json()
-
+        while not done and step_idx < 10:
+            action_raw = llm_call(f"State: {state}")
+            action = "save"
+            for a in ["invest", "save", "spend"]:
+                if a in action_raw:
+                    action = a
+                    break
+            
+            result = post_env("/step", {"action": action})
+            state = result.get("state")
+            done = result.get("done")
             reward = float(result.get("reward", 0.0))
-            done = result.get("done", False)
-            state = result.get("state", {})
-
+            final_score = result.get("score", 0.0)
+            
             rewards.append(reward)
-            step_count += 1
+            step_idx += 1
+            print(f"[STEP] {step_idx} reward={reward}")
 
-            log_step(step_count, reward)
-
-        if done:
-            success = True
-
-        log_end(success, step_count, rewards)
-
+        rewards_str = ",".join([f"{r:.2f}" for r in rewards])
+        print(f"[END] success=true steps={step_idx} rewards={rewards_str} score={final_score}")
     except Exception as e:
-        print("[ERROR]", str(e))
-        log_end(False, 0, [])
-
+        print(f"[ERROR] {e}")
+        print("[END] success=false steps=0 rewards= score=0.0")
 
 if __name__ == "__main__":
     main()
