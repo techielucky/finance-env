@@ -1,19 +1,18 @@
 import random
 from grader import grade
 
-
 class FinanceEnv:
     def __init__(self, task="easy"):
         self.reset(task)
 
     def reset(self, task="easy"):
         self.task = task
-
+        # Different starting conditions based on task
         if task == "easy":
             self.balance = 1200
         elif task == "medium":
             self.balance = 800
-        else:
+        else: # hard
             self.balance = 400
 
         self.savings = 0
@@ -24,9 +23,9 @@ class FinanceEnv:
         return self.state()
 
     def step(self, action):
-        reward = 0
+        reward = 0.0
 
-        # ===== ACTION EFFECT =====
+        # ===== ACTION LOGIC =====
         if action == "invest":
             if self.balance >= 100:
                 self.balance -= 100
@@ -34,7 +33,6 @@ class FinanceEnv:
                 reward += 1.5
             else:
                 reward -= 2.0
-
         elif action == "save":
             if self.balance >= 50:
                 self.balance -= 50
@@ -42,62 +40,38 @@ class FinanceEnv:
                 reward += 1.0
             else:
                 reward -= 1.5
-
         elif action == "spend":
             self.balance -= 100
             self.expense += 100
             reward -= 1.5
-
         else:
             reward -= 3.0
 
-        # ===== STATE IMPROVEMENT =====
-        net_worth = self.balance + self.savings - self.expense
-
-        if net_worth > 500:
-            reward += 1.0
-        elif net_worth < 0:
-            reward -= 2.0
-
-        # ===== GOAL PROGRESS =====
-        progress = self.savings / self.goal
-        reward += progress * 2.0
-
-        # ===== BAD BEHAVIOR =====
-        if self.expense > self.savings:
-            reward -= 1.0
-
-        # ===== RANDOM EVENTS =====
-        event = random.choice(["none", "bonus", "emergency"])
-
+        # ===== STOCHASTIC EVENTS =====
+        event = random.choice(["none", "none", "bonus", "emergency"])
         if event == "bonus":
             self.balance += 200
-            reward += 0.5
-
         elif event == "emergency":
             self.balance -= 150
-            reward -= 0.7
 
         self.step_count += 1
-
+        
+        # Done if max steps reached or bankrupt
         done = self.step_count >= 10 or self.balance <= 0
 
-        # ===== NORMALIZE REWARD =====
-        reward = max(-5.0, min(5.0, reward))
-
-        # ===== FINAL SCORE =====
-        final_score = grade(self.state()) if done else 0.0
+        # ===== GRADING =====
+        # We pass self.task so the grader can validate multiple tasks
+        final_score = grade(self.state(), self.task) if done else 0.0
 
         return {
             "state": self.state(),
-            "reward": reward,
+            "reward": max(-5.0, min(5.0, reward)),
             "done": done,
             "score": final_score,
             "event": event,
-            "info": {}
+            "info": {"task": self.task}
         }
 
-    # ✅ THIS WAS MISSING — NOW FIXED
     def state(self):
         return {
             "balance": self.balance,
