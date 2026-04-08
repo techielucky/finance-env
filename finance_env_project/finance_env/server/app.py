@@ -1,31 +1,25 @@
-from fastapi import FastAPI
-from server.finance_env_environment import FinanceEnv
+from fastapi import FastAPI, Query
+from finance_env_environment import FinanceEnv
 
 app = FastAPI()
 env = FinanceEnv()
 
-
 @app.post("/reset")
-def reset():
-    return env.reset()
-
+def reset(task: str = Query("easy")):
+    return env.reset(task=task)
 
 @app.post("/step")
-def step(action: str):
+def step(data: dict):
+    action = data.get("action", "save")
     return env.step(action)
-
 
 @app.get("/state")
 def state():
     return env.state()
 
-
-# ✅ REQUIRED: callable main()
 def main():
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
 
-
-# ✅ REQUIRED: script entrypoint
 if __name__ == "__main__":
     main()
