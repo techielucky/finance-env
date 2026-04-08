@@ -1,18 +1,44 @@
-name: finance-env
-description: Real-world financial decision-making RL environment
+name: finance_env
+version: "1.0.0"
+description: >
+  A financial environment for AI agent training across three difficulty tiers.
+
+author: "Your Team Name"
+tags:
+  - openenv
+  - finance
 
 tasks:
-  - easy
-  - medium
-  - hard
+  - id: easy
+    description: "Solve a basic financial task with minimal constraints."
+    difficulty: easy
+    max_attempts: 5
+    scoring: "0.0–1.0 partial credit"
+  - id: medium
+    description: "Intermediate task with moderate complexity."
+    difficulty: medium
+    max_attempts: 5
+    scoring: "0.0–1.0 partial credit"
+  - id: hard
+    description: "Complex task with full constraints."
+    difficulty: hard
+    max_attempts: 5
+    scoring: "0.0–1.0 partial credit"
 
-actions:
-  - invest
-  - save
-  - spend
+reward:
+  type: continuous
+  range: [0.0, 1.0]
 
-observation:
-  balance: float
-  savings: float
-  expense: float
-  goal: float
+endpoints:
+  - path: /reset
+    method: POST
+  - path: /step
+    method: POST
+  - path: /state
+    method: GET
+  - path: /tasks
+    method: GET
+  - path: /grader
+    method: POST
+  - path: /health
+    method: GET

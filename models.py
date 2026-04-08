@@ -1,12 +1,17 @@
 from pydantic import BaseModel
+from typing import Dict, Any, Optional
 
 class Observation(BaseModel):
-    balance: int
-    savings: int
-    expense: int
+    balance: float
+    savings: float
+    expense: float
+    goal: float
 
 class Action(BaseModel):
-    action: str  # spend, save, invest
+    action: str  # invest, save, spend
 
-class Reward(BaseModel):
-    value: float
+class StepResult(BaseModel):
+    state: Observation
+    reward: float
+    done: bool
+    score: float
