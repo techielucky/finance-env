@@ -6,4 +6,7 @@ class Observation(BaseModel):
     expense: int
 
 class Action(BaseModel):
-    action: str
+    action: str  # spend, save, invest
+
+class Reward(BaseModel):
+    value: float

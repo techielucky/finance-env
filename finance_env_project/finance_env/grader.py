@@ -1,16 +1,19 @@
-def grade_easy(state):
-    # avoid overspending
-    if state["expense"] < 500:
-        return 1.0
-    return 0.3
+def grade(state):
+    savings = state.get("savings", 0)
+    expense = state.get("expense", 0)
+    balance = state.get("balance", 0)
 
+    score = 0.0
 
-def grade_medium(state):
-    # savings goal
-    return min(1.0, state["savings"] / 500)
+    # reward savings (max 0.5)
+    score += min(savings / 1000, 0.5)
 
+    # penalty for overspending
+    if expense > savings:
+        score -= 0.3
 
-def grade_hard(state):
-    # overall wealth
-    total = state["balance"] + state["savings"]
-    return min(1.0, total / 1500)
+    # reward stability
+    if balance > 300:
+        score += 0.3
+
+    return max(0.0, min(1.0, score))

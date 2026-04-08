@@ -1,35 +1,102 @@
-import random
+import os
+from openai import OpenAI
+import requests
 
-from server.finance_env_environment import FinanceEnvironment
-from grader import grade_easy, grade_medium, grade_hard
+API_BASE_URL = os.getenv("API_BASE_URL")
+API_KEY = os.getenv("API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=API_KEY
+)
 
 
-env = FinanceEnvironment()
+def log_start():
+    print("[START]")
 
-state = env.reset()
-total_reward = 0
-steps = 0
 
-print("[START] task=finance env=finance_env model=baseline")
+def log_step(step, reward):
+    print(f"[STEP] step={step} reward={reward:.2f}")
 
-while True:
-    action = random.choice(["spend", "save", "invest"])
 
-    state, reward, done, _ = env.step(action)
+def log_end(success, steps, rewards):
+    rewards_str = ",".join([f"{r:.2f}" for r in rewards])
+    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}")
 
-    print(f"[STEP] step={steps} action={action} reward={reward:.2f} done={str(done).lower()} error=null")
 
-    total_reward += reward
-    steps += 1
+def get_action(state):
+    prompt = f"""
+You are a financial decision agent.
 
-    if done:
-        break
+State:
+{state}
 
-# grading
-easy_score = grade_easy(state)
-medium_score = grade_medium(state)
-hard_score = grade_hard(state)
+Choose ONE action from:
+- invest
+- save
+- spend
 
-final_score = (easy_score + medium_score + hard_score) / 3
+Respond with ONLY the action.
+"""
 
-print(f"[END] success=true steps={steps} rewards={total_reward:.2f} score={final_score:.2f}")
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+
+    action = response.choices[0].message.content.strip().lower()
+
+    if action not in ["invest", "save", "spend"]:
+        action = "save"
+
+    return action
+
+
+def main():
+    try:
+        log_start()
+
+        rewards = []
+        step_count = 0
+        success = False
+
+        # RESET
+        res = requests.post(f"{API_BASE_URL}/reset")
+        state = res.json()
+
+        done = False
+
+        while not done and step_count < 10:
+
+            action = get_action(state)
+
+            res = requests.post(
+                f"{API_BASE_URL}/step",
+                params={"action": action}
+            )
+
+            result = res.json()
+
+            reward = float(result.get("reward", 0.0))
+            done = result.get("done", False)
+            state = result.get("state", {})
+
+            rewards.append(reward)
+            step_count += 1
+
+            log_step(step_count, reward)
+
+        if done:
+            success = True
+
+        log_end(success, step_count, rewards)
+
+    except Exception as e:
+        print("[ERROR]", str(e))
+        log_end(False, 0, [])
+
+
+if __name__ == "__main__":
+    main()

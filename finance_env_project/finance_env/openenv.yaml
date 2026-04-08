@@ -1,7 +1,18 @@
-spec_version: 1
-name: finance_env
-type: space
-runtime: fastapi
-app: server.app:app
-port: 8000
+name: finance-env
+description: Real-world financial decision-making RL environment
 
+tasks:
+  - easy
+  - medium
+  - hard
+
+actions:
+  - invest
+  - save
+  - spend
+
+observation:
+  balance: float
+  savings: float
+  expense: float
+  goal: float
