@@ -1,3 +1,16 @@
-from .finance_env_environment import FinanceEnv
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
 
-__all__ = ["FinanceEnv"]
+"""Finance Env Environment."""
+
+from .client import FinanceEnv
+from .models import FinanceAction, FinanceObservation
+
+__all__ = [
+    "FinanceAction",
+    "FinanceObservation",
+    "FinanceEnv",
+]

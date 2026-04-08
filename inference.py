@@ -1,27 +1,102 @@
+import os
+from openai import OpenAI
 import requests
 
-BASE_URL = "https://lucky02006-finance-env.hf.space"
+API_BASE_URL = os.getenv("API_BASE_URL")
+API_KEY = os.getenv("API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
-print("[START] task=finance env=finance_env model=baseline")
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=API_KEY
+)
 
-state = requests.post(f"{BASE_URL}/reset", params={"task": "medium"}).json()
 
-total_reward = 0
+def log_start():
+    print("[START]")
 
-for step in range(10):
-    action = "save"
 
-    res = requests.post(f"{BASE_URL}/step", params={"action": action}).json()
+def log_step(step, reward):
+    print(f"[STEP] step={step} reward={reward:.2f}")
 
-    reward = res["reward"]
-    done = res["done"]
-    event = res.get("event", "none")
 
-    total_reward += reward
+def log_end(success, steps, rewards):
+    rewards_str = ",".join([f"{r:.2f}" for r in rewards])
+    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}")
 
-    print(f"[STEP] step={step} action={action} reward={reward} event={event} done={done}")
 
-    if done:
-        score = res.get("score", 0.0)
-        print(f"[END] success=True steps={step+1} rewards={total_reward:.2f} score={score:.2f}")
-        break
+def get_action(state):
+    prompt = f"""
+You are a financial decision agent.
+
+State:
+{state}
+
+Choose ONE action from:
+- invest
+- save
+- spend
+
+Respond with ONLY the action.
+"""
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+
+    action = response.choices[0].message.content.strip().lower()
+
+    if action not in ["invest", "save", "spend"]:
+        action = "save"
+
+    return action
+
+
+def main():
+    try:
+        log_start()
+
+        rewards = []
+        step_count = 0
+        success = False
+
+        # RESET
+        res = requests.post(f"{API_BASE_URL}/reset")
+        state = res.json()
+
+        done = False
+
+        while not done and step_count < 10:
+
+            action = get_action(state)
+
+            res = requests.post(
+                f"{API_BASE_URL}/step",
+                params={"action": action}
+            )
+
+            result = res.json()
+
+            reward = float(result.get("reward", 0.0))
+            done = result.get("done", False)
+            state = result.get("state", {})
+
+            rewards.append(reward)
+            step_count += 1
+
+            log_step(step_count, reward)
+
+        if done:
+            success = True
+
+        log_end(success, step_count, rewards)
+
+    except Exception as e:
+        print("[ERROR]", str(e))
+        log_end(False, 0, [])
+
+
+if __name__ == "__main__":
+    main()
